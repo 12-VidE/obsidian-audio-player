@@ -127,13 +127,14 @@ If your plugin does not need CSS, delete this file.
 	gap: 2px;
 }
 .comment {
+    padding: 5px;
+	border-radius: 3px;
 	margin-left: 5px;
 	min-height: 20px;
 	transition: all 0.2s;
 	display: grid;
 	grid-template-columns: auto 1fr 16px;
 	gap: 10px;
-	padding-right: 4px;
 }
 
 .comment:hover {
@@ -169,10 +170,16 @@ If your plugin does not need CSS, delete this file.
 	gap: 6px;
 	margin-top: 4px;
 }
+
 .comment > .content {
+    cursor: pointer;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
+.comment > .content:hover {
+	color: var(--color-accent-1);
+}
+
 .comment > .timestamp:hover {
 	color: var(--color-accent-1);
 }
@@ -181,5 +188,6 @@ If your plugin does not need CSS, delete this file.
 	background-color: #ffffff10;
 }
 .active-comment > .timestamp {
+    cursor: pointer;
 	color: var(--white);
 }

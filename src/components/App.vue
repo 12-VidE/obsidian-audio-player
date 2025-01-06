@@ -61,15 +61,15 @@
 </template>
 
 <script lang="ts">
-import { TFile, setIcon, MarkdownPostProcessorContext } from 'obsidian'
-import { defineComponent, PropType } from 'vue';
-import { AudioComment } from '../types'
-import { secondsToString, secondsToNumber } from '../utils'
+import { TFile, setIcon, MarkdownPostProcessorContext } from "obsidian"
+import { defineComponent, PropType } from "vue";
+import { AudioComment } from "../types"
+import { secondsToString, secondsToNumber } from "../utils"
 
-import AudioCommentVue from './AudioComment.vue';
+import AudioCommentVue from "./AudioComment.vue";
 
 export default defineComponent({
-  name: 'App',
+  name: "App",
   components: {
     AudioCommentVue
   },
@@ -202,6 +202,10 @@ export default defineComponent({
     setLoopValue(value : boolean){
       this.audio.loop = value;
     },
+    playFrom(time: any) {
+        this.setPlayheadSecs(time);
+        this.play();
+    },
     setPlayheadSecs(time: any) {
       this.currentTime = time;
       if (!this.isCurrent()) 
@@ -316,7 +320,7 @@ export default defineComponent({
       
       return !(loopSetting === null);
     },
-    getBookmarkValues() : Array<AudioComment> {
+    getBookmarkValues() : Array<AudioComment> { // alias: getComments
       const sectionInfo = this.getSectionInfo();
       const lines = sectionInfo.text.split('\n') as string[];
 
