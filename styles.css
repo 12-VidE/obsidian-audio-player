@@ -177,3 +177,8 @@ If your plugin does not need CSS, delete this file.
     cursor: pointer;
 	color: var(--white);
 }
+
+.disabled-block {
+    pointer-events: none; 
+    opacity: 0.6;
+}

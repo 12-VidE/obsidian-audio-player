@@ -1,6 +1,6 @@
 <template>
     <div class="audio-player-ui" tabindex="0">
-        <div class="horiz">
+        <div :class="['horiz', showInput && 'disabled-block']">
             <!-- WaveGraph + Timeline -->
             <div class="vert wide">
                 <div class="waveform wide">
@@ -20,7 +20,7 @@
             </div>
         </div>
         <!-- Controls -->
-        <div class="horiz" :style="{'margin': 'auto'}">
+        <div :class="['horiz', showInput && 'disabled-block']" style="margin: auto">
             <div class="playpause seconds" @click="setPlayPosition(currentTime-5)" ref="min5">-5s</div>
             <div class="playpause" @click="togglePlay" ref="playpause"></div>
             <div class="playpause seconds" @click="setPlayPosition(currentTime+5)" ref="add5">+5s</div>
@@ -36,7 +36,7 @@
             <button v-if="editMode" @click="showInput = false; editMode = false; deleteTimestamp(editTime)">Delete</button>
         </div>
         <!-- Timestamps list -->
-        <div class="comment-list">
+        <div :class="['comment-list', showInput && 'disabled-block']">
             <AudioTimestampVue v-for="cmt in commentsSorted" v-bind:class="{'active-comment': cmt == activeComment }"
                 @move-playhead="setPlayPosition" 
                 @edit-timestamp="editTimestamp"
@@ -172,7 +172,7 @@ export default defineComponent({
             if(newIndex == -1) console.warn("Impossible index");    
         }
 
-        lines.splice(sectionInfo.lineEnd-timestamps.length+newIndex, this.EditMode ? 1 : 0, `${newTimestamp.time} --- ${newTimestamp.content}`);
+        lines.splice(sectionInfo.lineEnd-timestamps.length+newIndex, this.editMode ? 1 : 0, `${newTimestamp.time} --- ${newTimestamp.content}`);
         window.app.vault.adapter.write(this.ctx.sourcePath, lines.join('\n'));
 
         // Reset states
