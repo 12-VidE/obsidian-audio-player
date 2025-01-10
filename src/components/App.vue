@@ -1,77 +1,66 @@
 <template>
-  <div class="audio-player-ui" tabindex="0">
-    <div class="horiz">
-      <div v-show="!smallSize" class="vert">
-        <div class="playpause" @click="togglePlay" ref="playpause">
+    <div class="audio-player-ui" tabindex="0">
+        <div class="horiz">
+            <!-- WaveGraph + Timeline -->
+            <div class="vert wide">
+                <div class="waveform wide">
+                    <div class="wv" v-for="(s, i) in filteredData" :key="srcPath+i"
+                        v-bind:class="{'played': i <= currentBar }"
+                        :style="{
+                            height: s * 100 + 'px'
+                    }"></div>
+                </div>
+                <div class="wide">
+                    <input type="range" id="timeline-range" min="0" :max="duration" step="0.1" v-model="currentTime" @input="onTimeBarInput" />
+                    <div class="timeline">
+                        <span class="current-time">{{ displayedCurrentTime }}</span>
+                        <span class="duration">{{ displayedDuration }}</span>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="playpause seconds" @click="setPlayheadSecs(currentTime+5)" ref="add5">
-          +5s
+        <!-- Controls -->
+        <div class="horiz" :style="{'margin': 'auto'}">
+            <div class="playpause seconds" @click="setPlayPosition(currentTime-5)" ref="min5">-5s</div>
+            <div class="playpause" @click="togglePlay" ref="playpause"></div>
+            <div class="playpause seconds" @click="setPlayPosition(currentTime+5)" ref="add5">+5s</div>
+            <div class="showTimestamp" @click="showTimestampInput" ref="showTimestamp"></div>
         </div>
-        <div class="playpause seconds" @click="setPlayheadSecs(currentTime-5)" ref="min5">
-          -5s
+        <!-- Timestamp Input -->
+        <div v-if="showInput" class="timestamp-input">
+            <input v-model="newTimestamp" type="text" ref="commentInput"
+                @keydown.escape="showInput = false; editMode = false; newTimestamp = ''" 
+                @keydown.enter="addTimestamp">
+            <button @click="addTimestamp">{{editMode ? "Confirm" : "Add"}}</button>
+            <button @click="showInput = false; editMode = false; newTimestamp = ''">Cancel</button>
+            <button v-if="editMode" @click="showInput = false; editMode = false; deleteTimestamp(editTime)">Delete</button>
         </div>
-      </div>
-      <div class="vert wide">
-        <div class="waveform">
-          <div class="wv" v-for="(s, i) in filteredData" :key="srcPath+i"
-            v-bind:class="{'played': i <= currentBar }"
-            @mousedown="barMouseDownHandler(i)"
-            :style="{
-              height: s * 100 + 'px'
-            }">
-          </div>
+        <!-- Timestamps list -->
+        <div class="comment-list">
+            <AudioTimestampVue v-for="cmt in commentsSorted" v-bind:class="{'active-comment': cmt == activeComment }"
+                @move-playhead="setPlayPosition" 
+                @edit-timestamp="editTimestamp"
+                :cmt="cmt" :key="cmt.time">
+            </AudioTimestampVue>
         </div>
-        <div class="timeline">
-          <span class="current-time">
-            {{ displayedCurrentTime }}
-          </span>
-          <span class="duration">
-            {{ displayedDuration }}
-          </span>
-        </div>
-      </div>
-      <div v-show="!smallSize" class="vert">
-        <div class="bookmarkButton" @click="onBookMarkClicked" ref="bookmarkButton">
-        </div>
-      </div>
     </div>
-    <div v-show="smallSize" class="horiz" :style="{'margin': 'auto'}">
-      <div class="playpause seconds" @click="setPlayheadSecs(currentTime-5)" ref="min5">
-        -5s
-      </div>
-      <div class="playpause play-button" @click="togglePlay" ref="playPauseSmall">
-      </div>
-      <div class="playpause seconds" @click="setPlayheadSecs(currentTime+5)" ref="add5">
-        +5s
-      </div>
-    </div>
-    <div v-if="showInput" class="comment-input">
-      <input v-model="newComment" 
-        @keydown.escape="showInput = false; newComment = ''" type="text" ref="commentInput"
-        @keydown.enter="addComment">
-      <button @click="addComment">Add</button>
-      <button @click="showInput = false; newComment = ''">Cancel</button>
-    </div>
-    <div class="comment-list">
-      <AudioCommentVue v-for="cmt in commentsSorted" v-bind:class="{'active-comment': cmt == activeComment }"
-        @move-playhead="setPlayheadSecs" @remove="removeComment"
-        :cmt="cmt" :key="cmt.timeString"></AudioCommentVue>
-    </div>
-  </div>
 </template>
 
 <script lang="ts">
-import { TFile, setIcon, MarkdownPostProcessorContext } from "obsidian"
+import { TFile, setIcon, MarkdownPostProcessorContext } from "obsidian";
 import { defineComponent, PropType } from "vue";
-import { AudioComment } from "../types"
-import { secondsToString, secondsToNumber } from "../utils"
+import { AudioTimestamp } from "../types";
+import { secondsToString } from "../utils";
 
-import AudioCommentVue from "./AudioComment.vue";
+import AudioTimestampVue from "./AudioTimestamp.vue";
+
+
+const regexTimestamp = new RegExp('^(.+) --- (.+)$');
 
 export default defineComponent({
   name: "App",
   components: {
-    AudioCommentVue
+    AudioTimestampVue
   },
   props: {
     filepath: String,
@@ -79,43 +68,223 @@ export default defineComponent({
     mdElement: Object as PropType<HTMLElement>,
     audio: Object as PropType<HTMLAudioElement>
   },
-  data() {
-    return {
-      toggle: false,
-      items: [...Array(100).keys()],
-      srcPath: '',
+    data() {
+        return {
+        items: [...Array(100).keys()],
+        srcPath: '',
 
-      filteredData: [] as number[],
-      nSamples: 150,
-      duration: 0,
-      currentTime: 0,
-      playing: false,
-      button: undefined as HTMLSpanElement | undefined,
-      buttonSmall: undefined as HTMLSpanElement | undefined,
+        filteredData: [] as number[],
+        nSamples: 150,
+        duration: 0,
 
-      clickCount: 0,
-      showInput: false,
-      newComment: '',
-      comments: [] as AudioComment[],
-      activeComment: null as AudioComment | null,
 
-      ro: ResizeObserver,
-      smallSize: false,
-    }
-  },
+        currentTime: 0,
+        playing: false,
+            
+        editMode: false,
+        editTime: -1,
+        showInput: false,
+        newTimestamp: '',
+
+        comments: [] as AudioTimestamp[],
+        activeComment: null as AudioTimestamp | null,
+        }
+    },
   computed: {
     displayedCurrentTime() { return secondsToString(this.currentTime); },
     displayedDuration() { return secondsToString(this.duration); },
+
     currentBar() { return Math.floor(this.currentTime / this.duration * this.nSamples); },
-    commentsSorted() { return this.comments.sort((x: AudioComment, y:AudioComment) => x.timeNumber - y.timeNumber); },
+    commentsSorted() { return this.comments.sort((x: AudioTimestamp, y:AudioTimestamp) => x.time - y.time); },
   },
   methods: {
-    getSectionInfo() { return this.ctx.getSectionInfo(this.mdElement); },
+    /* --- Audio State --- */
+    play() {
+        if (this.currentTime > 0)
+            this.audio.currentTime = this.currentTime;
+
+        this.setPlayBackRate(this.getPlaybackSpeedSetting());
+        this.setLoopValue(this.getLoopSetting());
+        this.audio.addEventListener('timeupdate', this.timeUpdateHandler); //Fix
+        
+        this.audio?.play();
+        this.playing = true;
+        setIcon(this.playpauseBtn, "pause");  
+    },
+    pause() {
+        this.audio?.pause();
+        this.playing = false;
+        setIcon(this.playpauseBtn, "play");
+    },
+    togglePlay() {
+        if (!this.isCurrent())
+            this.audio.src = this.srcPath;
+        this.audio.paused ? this.play() : this.pause();
+    },
+    setPlayPosition(time: number) {
+        console.log("###" + time);
+        this.currentTime = time;
+        if (!this.isCurrent())
+            this.togglePlay();
+
+        if (this.isCurrent())
+            this.audio.currentTime = time;
+    },
+    onTimeBarInput() {
+        // Validate and update the audio's current time
+        if (!isNaN(this.currentTime) && this.audio)
+            this.audio.currentTime = this.currentTime;
+    },
+
+    /* --- Timestamp --- */
+    showTimestampInput() {
+        this.pause();
+        this.showInput = true; // triggers template TO show section
+        setTimeout(() => {
+            const input = this.$refs.commentInput as HTMLInputElement;
+            input.focus();
+        })
+    },
+    addTimestamp() {
+        if (this.newTimestamp.length == 0)
+            return;
+        
+        const timestamps = this.getTimestamps();
+        const sectionInfo = this.ctx.getSectionInfo(this.mdElement);
+        const lines = sectionInfo.text.split('\n') as string[];
+        
+        let newTimestamp : AudioTimestamp;
+        let newIndex : number;
+
+        if(!this.editMode){
+            newTimestamp = {
+                time: Math.floor(this.currentTime),
+                content: this.newTimestamp,
+            };
+            newIndex = timestamps.findIndex((item : AudioTimestamp) => newTimestamp.time < item.time);
+            if(newIndex == -1) newIndex = timestamps.length; // Edge-case WHERE it doesn't find a solution = it must be last
+        } else {
+            newTimestamp = {
+                time: this.editTime,
+                content: this.newTimestamp,
+            };
+            newIndex = timestamps.findIndex((item : AudioTimestamp) => newTimestamp.time == item.time);
+            if(newIndex == -1) console.warn("Impossible index");    
+        }
+
+        lines.splice(sectionInfo.lineEnd-timestamps.length+newIndex, this.EditMode ? 1 : 0, `${newTimestamp.time} --- ${newTimestamp.content}`);
+        window.app.vault.adapter.write(this.ctx.sourcePath, lines.join('\n'));
+
+        // Reset states
+        this.showInput = false;
+        this.editMode = false;
+        this.editTime = -1;
+    },
+    deleteTimestamp(time: number){
+        const timestamps = this.getTimestamps();
+        const sectionInfo = this.ctx.getSectionInfo(this.mdElement);
+        const lines = sectionInfo.text.split('\n') as string[];
+        const newIndex = timestamps.findIndex((item : AudioTimestamp) => time == item.time);
+        if (newIndex == -1) return;
+
+        lines.splice(sectionInfo.lineEnd-timestamps.length+newIndex, 1);
+        window.app.vault.adapter.write(this.ctx.sourcePath, lines.join('\n'));
+    },
+    editTimestamp(time: number){
+        // Set states
+        this.showInput = true;
+        this.editMode = true;
+        this.editTime = time;
+
+        // Place timestamp
+        this.newTimestamp = this.getTimestamp(time).content;
+    },
+    getTimestamps() : Array<AudioTimestamp> {
+        const timestampLines = this.getPluginCodeBlockData(regexTimestamp);
+        const timestamps = timestampLines.map((line : string, index : Number) => {
+            const match = regexTimestamp.exec(line);
+            return {
+                time: Number(match![1]), 
+                content: String(match![2]),
+                index: index
+            } as AudioTimestamp  
+        });
+        return timestamps;
+    },
+    getTimestamp(time: number) : AudioTimestamp {
+        const timestamps = this.getTimestamps();
+        let newIndex : number = timestamps.findIndex((item : AudioTimestamp) => time == item.time);
+        return timestamps[newIndex];
+    },
+
+
+
+    /* -- Controls Handling --- */
+
+
+
+    /* -- Other -- */
+    getPluginCodeBlockData(regex: RegExp = /^.*$/) : Array<string> {
+        const sectionInfo = this.ctx.getSectionInfo(this.mdElement);    // What's inside the code-block
+        const lines : Array<string> = sectionInfo.text.split('\n');
+        return lines.filter((item : string) => regex.test(item));
+    },
+
+
+    timeUpdateHandler() {
+      if (this.isCurrent()) {
+        this.currentTime = this.audio?.currentTime;
+
+        const nextCommencts = this.commentsSorted.filter((x: AudioTimestamp) => this.audio?.currentTime >= x.time);
+        
+        if (nextCommencts.length == 1) {
+          this.activeComment = nextCommencts[0];
+        }
+        if (nextCommencts.length > 1) {
+          this.activeComment = nextCommencts[nextCommencts.length - 1];
+        }
+      }
+
+    },
+
+    getFirstOrDefaultSettingsValue(expretion : RegExp) : string | null 
+    {
+      const filteredLines = this.getPluginCodeBlockData(expretion)
+      if(filteredLines.length == 0) return null;
+      const settingValue = expretion.exec(filteredLines[0])?.at(1);
+      if((settingValue === undefined)) return null;
+      return settingValue;
+    },
+
+    getLoopValue() : boolean {
+      return false;
+    },
+
+    getPlaybackSpeedSetting() : number {
+      const defaultSpeed = this.audio.defaultPlaybackRate;
+      
+      const regex = new RegExp('playback: *([0-9\.]*)', 'g');
+      
+      const playbackSpeed = this.getFirstOrDefaultSettingsValue(regex);
+      
+      if((playbackSpeed === null)) return defaultSpeed;
+      var numericRepr = parseFloat(playbackSpeed);
+      if(isNaN(numericRepr)) return defaultSpeed;
+      return numericRepr;
+    },
+
+    getLoopSetting() : boolean {
+      const defaultSpeed = this.audio.defaultPlaybackRate;
+      
+      const regex = new RegExp('loop: *((t|T)rue)', 'g');
+      
+      const loopSetting = this.getFirstOrDefaultSettingsValue(regex);
+      
+      return !(loopSetting === null);
+    },
+    
     getParentWidth() { return this.mdElement.clientWidth },
     isCurrent() { return this.audio.src === this.srcPath; },
-    onResize() { 
-      this.smallSize = this.$el.clientWidth < 300;
-    },
     async loadFile() {
       // read file from vault 
       const file = window.app.vault.getAbstractFileByPath(this.filepath) as TFile;
@@ -167,230 +336,58 @@ export default defineComponent({
         this.saveCache();
       })
     },
-    showCommentInput() {
-      this.showInput = true;
-      setTimeout(() => {
-        const input = this.$refs.commentInput as HTMLInputElement;
-        input.focus();
-      })
-    },
-    barMouseDownHandler(i: number) {
-      this.clickCount += 1;
-      setTimeout(() => {
-        this.clickCount = 0;
-      }, 200);
-
-      if (this.clickCount >= 2) {
-        this.showCommentInput();
-      } else {
-        let time = i / this.nSamples * this.duration;
-        this.setPlayheadSecs(time);
-        
-      }
-    },
-    onBookMarkClicked() {
-      this.pause();
-      this.audio.currentTime = this.audio.currentTime - 0.5;
-      this.showBookMarkDialog();
-    },
-    showBookMarkDialog() {
-      this.showInput = true;
-    },
     setPlayBackRate(multiplier : number){
       this.audio.playbackRate = multiplier;
     },
     setLoopValue(value : boolean){
       this.audio.loop = value;
     },
-    playFrom(time: any) {
-        this.setPlayheadSecs(time);
-        this.play();
-    },
-    setPlayheadSecs(time: any) {
-      this.currentTime = time;
-      if (!this.isCurrent()) 
-          this.togglePlay();
-
-      if (this.isCurrent()) {
-        this.audio.currentTime = time;
-      }
-    },
-    togglePlay() {
-      if (!this.isCurrent()) {
-        this.audio.src = this.srcPath;
-      }
-
-      if (this.audio.paused) {
-        this.globalPause();
-        this.play();
-      } else {
-        this.pause();
-      } 
-    },
-    play() {
-      if (this.currentTime > 0) {
-        this.audio.currentTime = this.currentTime;
-      }
-      this.setPlayBackRate(this.getPlaybackSpeedSetting());
-      this.setLoopValue(this.getLoopSetting());
-      this.audio.addEventListener('timeupdate', this.timeUpdateHandler);
-      this.audio?.play();
-      this.playing = true;
-      this.setBtnIcon('pause');      
-    },
-    pause() {
-      this.audio?.pause();
-      this.playing = false;
-      this.setBtnIcon('play');
-    },
-    globalPause() {
-      const ev = new Event('allpause');
-      document.dispatchEvent(ev);
-    },
-    timeUpdateHandler() {
-      if (this.isCurrent()) {
-        this.currentTime = this.audio?.currentTime;
-
-        const nextCommencts = this.commentsSorted.filter((x: AudioComment) => this.audio?.currentTime >= x.timeNumber);
-        
-        if (nextCommencts.length == 1) {
-          this.activeComment = nextCommencts[0];
-        }
-        if (nextCommencts.length > 1) {
-          this.activeComment = nextCommencts[nextCommencts.length - 1];
-        }
-      }
-
-    },
-    setBtnIcon(icon: string) { 
-      setIcon(this.button, icon);
-      setIcon(this.buttonSmall, icon); 
-    },
-    getCodeBlockSettingsValues(expretion : RegExp) : Array<string>
-    {
-        const sectionInfo = this.getSectionInfo();
-        const lines = sectionInfo.text.split('\n') as string[];
-        return lines.filter(item => item.match(expretion));
-    },
-    getFirstOrDefaultSettingsValue(expretion : RegExp) : string | null 
-    {
-      const filteredLines = this.getCodeBlockSettingsValues(expretion)
-      if(filteredLines.length == 0) return null;
-      const settingValue = expretion.exec(filteredLines[0])?.at(1);
-      if((settingValue === undefined)) return null;
-      return settingValue;
-    },
-    addComment() {
-      if (this.newComment.length == 0)
-        return;
-      const sectionInfo = this.getSectionInfo();
-      const lines = sectionInfo.text.split('\n') as string[];
-      const timeStamp = secondsToString(this.currentTime);
-      lines.splice(sectionInfo.lineEnd, 0, `${timeStamp} --- ${this.newComment}`);
-
-      window.app.vault.adapter.write(this.ctx.sourcePath, lines.join('\n'))
-    },
-    removeComment(i: number) {
-      const sectionInfo = this.getSectionInfo();
-      const lines = sectionInfo.text.split('\n') as string[];
-      lines.splice(sectionInfo.lineStart + 2 + i, 1);
-      window.app.vault.adapter.write(this.ctx.sourcePath, lines.join('\n'))
-    },
-    getLoopValue() : boolean {
-      return false;
-    },
-    getPlaybackSpeedSetting() : number {
-      const defaultSpeed = this.audio.defaultPlaybackRate;
-      
-      const regex = new RegExp('playback: *([0-9\.]*)', 'g');
-      
-      const playbackSpeed = this.getFirstOrDefaultSettingsValue(regex);
-      
-      if((playbackSpeed === null)) return defaultSpeed;
-      var numericRepr = parseFloat(playbackSpeed);
-      if(isNaN(numericRepr)) return defaultSpeed;
-      return numericRepr;
-    },
-    getLoopSetting() : boolean {
-      const defaultSpeed = this.audio.defaultPlaybackRate;
-      
-      const regex = new RegExp('loop: *((t|T)rue)', 'g');
-      
-      const loopSetting = this.getFirstOrDefaultSettingsValue(regex);
-      
-      return !(loopSetting === null);
-    },
-    getBookmarkValues() : Array<AudioComment> { // alias: getComments
-      const sectionInfo = this.getSectionInfo();
-      const lines = sectionInfo.text.split('\n') as string[];
-
-      const regex = new RegExp('[0-9]+:[0-9]+:[0-9]+ --- .*', 'g');
-      const filteredLines = lines.filter(item => item.match(regex));
-      const cmts = filteredLines.map((x, i) => {
-        const split = x.split(' --- ');
-        const timeStamp = secondsToNumber(split[0]);
-        const cmt: AudioComment = {
-          timeNumber: timeStamp,
-          timeString: split[0],
-          content: split[1],
-          index: i
-        }
-        return cmt;
-      });
-      return cmts;
-    },
   },
   created() { 
     this.loadFile();
   },
-  mounted() {
-    this.button = this.$refs.playpause as HTMLSpanElement;
-    this.buttonSmall = this.$refs.playPauseSmall as HTMLSpanElement;
-    this.setBtnIcon('play');
+    mounted() {
+        //Set (dynamic) buttons
+        this.playpauseBtn = this.$refs.playpause as HTMLSpanElement;
+        this.showtimestampBtn = this.$refs.showTimestamp as HTMLSpanElement;
 
-    this.bookmarkButton = this.$refs.bookmarkButton as HTMLSpanElement;
-    setIcon(this.bookmarkButton, 'bookmark-plus');
-    // add event listeners
-    document.addEventListener('allpause', () => {  
-      this.setBtnIcon('play'); 
-    });
-    document.addEventListener('allresume', () => {
-      if (this.isCurrent())
-        this.setBtnIcon('pause');
-    })
-    document.addEventListener('addcomment', () => {
-      if (this.isCurrent()) 
-        this.showCommentInput();
-    })
-    document.addEventListener('togglePlayState', () => {
-      if (this.audio.src === this.srcPath) {
-        this.togglePlay()
-        this.setBtnIcon(this.audio.paused ? 'play' : 'pause');
-      }
-    });
+        // Initialize icons
+        setIcon(this.playpauseBtn, "play");
+        setIcon(this.showtimestampBtn,"bookmark-plus");
 
-    this.audio.addEventListener('ended', () => {
-      if (this.audio.src === this.srcPath)
-        this.setBtnIcon('play');
-    });
+        // Add event listeners
+        document.addEventListener('allpause', () => {  
+            setIcon(this.playpauseBtn, "play");
+        });
+        document.addEventListener('allresume', () => {
+            if (this.isCurrent())
+            setIcon(this.playpauseBtn, "pause");
+        })
+        document.addEventListener('addcomment', () => {
+            if (this.isCurrent()) 
+            this.showCommentInput();
+        })
+        document.addEventListener('togglePlayState', () => {
+            if (this.audio.src === this.srcPath) {
+            this.togglePlay()
+            setIcon(this.playpauseBtn, this.audio.paused ? 'play' : 'pause');
+            }
+        });
 
-    this.$el.addEventListener('resize', () => {
-      console.log(this.$el.clientWidth);
-    })
+        this.audio.addEventListener('ended', () => {
+            if (this.audio.src === this.srcPath)
+                setIcon(this.playpauseBtn, "play");
+        });
 
-    // get current time
-    if (this.audio.src === this.srcPath) {
-      this.currentTime = this.audio.currentTime
-      this.audio.addEventListener('timeupdate', this.timeUpdateHandler);
-      this.setBtnIcon(this.audio.paused ? 'play' : 'pause');
-    }
+        // get current time
+        if (this.audio.src === this.srcPath) {
+            this.currentTime = this.audio.currentTime
+            this.audio.addEventListener('timeupdate', this.timeUpdateHandler);
+            setIcon(this.playpauseBtn, this.audio.paused ? 'play' : 'pause');
+        }
 
-    // load comments
-    setTimeout(() => { this.comments = this.getBookmarkValues(); });
-
-
-    this.ro = new ResizeObserver(this.onResize);
-    this.ro.observe(this.$el);
+        // load comments
+        setTimeout(() => { this.comments = this.getTimestamps(); });
   },
   beforeDestroy() {
     this.ro.unobserve(this.$el);

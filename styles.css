@@ -6,6 +6,26 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+/* Positioning */
+.vert {
+	display: flex;
+	flex-direction: column;
+}
+.vert:first-of-type {
+	margin-right: 10px;
+}
+
+.horiz {
+	display: flex;
+}
+
+/* Size */
+.wide {
+	width: 100%;
+}
+
+
 .audio-player-container {
 	width: 100%;
 	height: fit-content;
@@ -27,33 +47,23 @@ If your plugin does not need CSS, delete this file.
 .my-audio {
 	display: none;
 }
-.waveform {
-	width: 100%;
-	margin-top: 10px;
-	justify-content: space-between;
-	align-items: baseline;
+
+
+/* Timeline */
+#timeline-range {
+    width: 100%;
+    margin: 0;
+}
+.timeline {
+	height: 20px;
 	display: flex;
+	justify-content: space-between;
+	color: var(--color-base-50);
+	font-size: 0.9rem;
 }
 
-.wv {
-	flex: 1;
-	height: 100px;
-	background-color: var(--color-base-50);
-	border-left: 1px solid var(--color-base-10);
-	transition: all 0.2s;
-}
-
-.wv:hover {
-	background-color: var(--color-accent-2);
-}
-.wv:active {
-	background-color: var(--color-base-10);
-}
-
-.played {
-	background-color: var(--color-accent-1);
-}
-.bookmarkButton {
+/* Controls*/
+.showTimestamp {
 	flex: 1;
 	margin: 6px;
 	background-color: var(--color-base-50);
@@ -67,9 +77,10 @@ If your plugin does not need CSS, delete this file.
 	opacity: 0.8;
 	transition: all 0.15s;
 }
-.bookmarkButton:hover {
+.showTimestamp:hover {
 	opacity: 1;
 }
+
 .playpause {
 	flex: 1;
 	margin: 6px;
@@ -90,7 +101,7 @@ If your plugin does not need CSS, delete this file.
 .playpause:active {
 	background-color: var(--color-base-10);
 }
-.seconds {
+.playpause.seconds {
 	border-radius: 2;
 	min-height: unset;
 	padding-top: 0;
@@ -98,35 +109,34 @@ If your plugin does not need CSS, delete this file.
 	height: 25px;
 	flex: unset;
 }
-.vert {
-	display: flex;
-	flex-direction: column;
-}
-.vert:first-of-type {
-	margin-right: 10px;
-}
-.horiz {
-	display: flex;
-}
 
-.timeline {
-	height: 20px;
-	display: flex;
-	justify-content: space-between;
-	color: var(--color-base-50);
-	font-size: 0.9rem;
-}
-.wide {
+/* WaveForm Graph */
+.waveform {
 	width: 100%;
+	align-items: baseline;
+	display: flex;
 }
 
+.wv {
+	flex: 1;
+	height: 80px;
+	background-color: var(--color-base-50);
+	border-left: 1px solid var(--color-base-10);
+	transition: all 0.2s;
+}
+.wv.played {
+	background-color: var(--color-accent-1);
+}
+
+/* Timestamps */
 .comment-list {
 	margin-top: 10px;
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
 }
-.comment {
+
+.timestamp {
     padding: 5px;
 	border-radius: 3px;
 	margin-left: 5px;
@@ -135,58 +145,34 @@ If your plugin does not need CSS, delete this file.
 	display: grid;
 	grid-template-columns: auto 1fr 16px;
 	gap: 10px;
+    cursor: pointer;
+    &:hover {
+        background-color: var(--background-modifier-cover);
+    }
+    &:active {
+        background-color: var(--color-base-10);
+    }
+
+    > .time{
+        color: var(--color-base-50);
+    }
+
+    > .timestamp-content {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 }
 
-.comment:hover {
-	background-color: var(--background-modifier-cover);
-}
-.comment:active {
-	background-color: var(--color-base-10);
-}
-
-.comment > .timestamp,
-.comment > .delete-comment {
-	color: var(--color-base-50);
-}
-
-.delete-comment {
-	width: 20px;
-	height: 22px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	transition: all 0.2s;
-}
-.delete-comment:hover {
-	background-color: var(--color-red);
-	color: var(--white);
-}
-.delete-comment:active {
-	background-color: var(--color-base-10);
-}
-
-.comment-input {
+.timestamp-input {
 	display: flex;
 	gap: 6px;
 	margin-top: 4px;
 }
 
-.comment > .content {
-    cursor: pointer;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-.comment > .content:hover {
-	color: var(--color-accent-1);
-}
-
-.comment > .timestamp:hover {
-	color: var(--color-accent-1);
-}
-
 .active-comment {
 	background-color: #ffffff10;
 }
+
 .active-comment > .timestamp {
     cursor: pointer;
 	color: var(--white);
