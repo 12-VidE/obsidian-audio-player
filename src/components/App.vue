@@ -33,7 +33,7 @@
                 @keydown.enter="addTimestamp">
             <button @click="addTimestamp">{{editMode ? "Confirm" : "Add"}}</button>
             <button @click="showInput = false; editMode = false; deleteConfirm = false; newTimestamp = ''">Cancel</button>
-            <button v-if="editMode" @click="confirmDelete">{{ deleteConfirm ? 'Sure?' : 'Delete' }}</button>
+            <button v-if="editMode" @click="confirmDelete" :style="{ 'background-color': deleteConfirm ? 'var(--interactive-accent)' : '' }">{{ deleteConfirm ? 'Sure?' : 'Delete' }}</button>
         </div>
         <!-- Timestamps list -->
         <div :class="['comment-list', showInput && 'disabled-block']">
