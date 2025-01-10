@@ -4,13 +4,19 @@ import {
 	Notice,
 	Plugin,
 } from "obsidian";
-
+import { AudioPlayerOptions } from "./types";
 import { AudioPlayerRenderer } from "./audioPlayerRenderer";
 
 export default class AudioPlayer extends Plugin {
 	async onload() {
 		const player = document.createElement("audio");
-		player.volume = 0.5;
+
+        const defaultOption : AudioPlayerOptions = {
+            volume: 0.5,
+            speed: 1,
+            loop: false,
+        };
+
 		const body = document.getElementsByTagName("body")[0];
 		body.appendChild(player);
 
@@ -113,6 +119,7 @@ export default class AudioPlayer extends Plugin {
 						filepath: link.path,
 						ctx,
 						player,
+                        defaultOption: defaultOption,
 					})
 				);
 			}

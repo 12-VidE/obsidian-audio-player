@@ -49,13 +49,15 @@
 <script lang="ts">
 import { TFile, setIcon, MarkdownPostProcessorContext } from "obsidian";
 import { defineComponent, PropType } from "vue";
-import { AudioTimestamp } from "../types";
+import { AudioTimestamp, AudioPlayerOptions } from "../types";
 import { secondsToString } from "../utils";
 
 import AudioTimestampVue from "./AudioTimestamp.vue";
 
 
 const regexTimestamp = new RegExp('^(.+) --- (.+)$');
+const regexSpeed = new RegExp('speed: *([0-9\.]*)');
+const regexLoop = new RegExp('loop: *((t|T)rue)');
 
 export default defineComponent({
   name: "App",
@@ -66,28 +68,26 @@ export default defineComponent({
     filepath: String,
     ctx: Object as PropType<MarkdownPostProcessorContext>,
     mdElement: Object as PropType<HTMLElement>,
-    audio: Object as PropType<HTMLAudioElement>
+    audio: Object as PropType<HTMLAudioElement>,
+    defaultOption: Object as PropType<AudioPlayerOptions>
   },
     data() {
         return {
-        items: [...Array(100).keys()],
-        srcPath: '',
+            srcPath: '',
 
-        filteredData: [] as number[],
-        nSamples: 150,
-        duration: 0,
-
-
-        currentTime: 0,
-        playing: false,
+            filteredData: [] as number[],
+            nSamples: 150,
+            duration: 0,
             
-        editMode: false,
-        editTime: -1,
-        showInput: false,
-        newTimestamp: '',
+            currentTime: 0,
+            playing: false,
+                
+            editMode: false,
+            editTime: -1,
+            showInput: false,
+            newTimestamp: '',
 
-        comments: [] as AudioTimestamp[],
-        activeComment: null as AudioTimestamp | null,
+            activeComment: null as AudioTimestamp | null,
         }
     },
   computed: {
@@ -95,16 +95,68 @@ export default defineComponent({
     displayedDuration() { return secondsToString(this.duration); },
 
     currentBar() { return Math.floor(this.currentTime / this.duration * this.nSamples); },
-    commentsSorted() { return this.comments.sort((x: AudioTimestamp, y:AudioTimestamp) => x.time - y.time); },
+    commentsSorted() { return this.getTimestamps().sort((x: AudioTimestamp, y:AudioTimestamp) => x.time - y.time); },
   },
   methods: {
+    /* --- Backend --- */
+    async loadFile() {
+        // read file from vault 
+        const file = window.app.vault.getAbstractFileByPath(this.filepath) as TFile;
+
+        // process audio file & set audio el source
+        if (file && file instanceof TFile) {
+            //check cached values
+            if (!this.loadCache()) 
+                this.processAudio(file.path);
+            this.srcPath = window.app.vault.getResourcePath(file);
+        }
+    },
+    saveCache() {
+        localStorage[`${this.filepath}`] = JSON.stringify(this.filteredData);
+        localStorage[`${this.filepath}_duration`] = this.duration;
+    },
+    loadCache(): boolean {
+        let cachedData = localStorage[`${this.filepath}`];
+        let cachedDuration = localStorage[`${this.filepath}_duration`];
+
+        if (!cachedData) return false;
+        
+        this.filteredData = JSON.parse(cachedData);
+        this.duration = Number.parseFloat(cachedDuration)
+        return true;
+    },
+    async processAudio(path: string) {
+        const arrBuf = await window.app.vault.adapter.readBinary(path);
+        const audioContext = new AudioContext();
+        const tempArray = [] as number[];
+
+        audioContext.decodeAudioData(arrBuf, (buf) => {
+            let rawData = buf.getChannelData(0);
+            this.duration = buf.duration;
+
+            const blockSize = Math.floor(rawData.length / this.nSamples);
+            for (let i = 0; i < this.nSamples; i++) {
+                let blockStart = blockSize * i;
+                let sum = 0;
+                for (let j = 0; j < blockSize; j++)
+                    sum += Math.abs(rawData[blockStart + j]);
+                tempArray.push(sum / blockSize);
+            }
+            
+            let maxval = Math.max(...tempArray);
+            this.filteredData = tempArray.map(x => x / maxval);
+            this.saveCache();
+        })
+    },
+
     /* --- Audio State --- */
     play() {
         if (this.currentTime > 0)
             this.audio.currentTime = this.currentTime;
 
-        this.setPlayBackRate(this.getPlaybackSpeedSetting());
-        this.setLoopValue(this.getLoopSetting());
+        // Apply correct settings
+        this.setPlayBackRate(this.getSettingPlaybackSpeed());
+        this.setLoopValue(this.getSettingLoop());
         this.audio.addEventListener('timeupdate', this.timeUpdateHandler); //Fix
         
         this.audio?.play();
@@ -134,6 +186,12 @@ export default defineComponent({
         // Validate and update the audio's current time
         if (!isNaN(this.currentTime) && this.audio)
             this.audio.currentTime = this.currentTime;
+    },
+    setPlayBackRate(multiplier : number){
+      this.audio.playbackRate = multiplier;
+    },
+    setLoopValue(value : boolean){
+      this.audio.loop = value;
     },
 
     /* --- Timestamp --- */
@@ -217,8 +275,6 @@ export default defineComponent({
         return timestamps[newIndex];
     },
 
-
-
     /* -- Controls Handling --- */
 
 
@@ -228,6 +284,26 @@ export default defineComponent({
         const sectionInfo = this.ctx.getSectionInfo(this.mdElement);    // What's inside the code-block
         const lines : Array<string> = sectionInfo.text.split('\n');
         return lines.filter((item : string) => regex.test(item));
+    },
+    getSettingPlaybackSpeed() : number {
+        const defaultMultiplier : number = this.defaultOption.speed;
+        const filteredLine = this.getPluginCodeBlockData(regexSpeed);
+        if (filteredLine.length == 0) 
+            return defaultMultiplier;
+        let multiplier : number = parseFloat(regexSpeed.exec(filteredLine[0])![1]);
+        multiplier = Math.round(multiplier*10)/10; // Allow only 1 decimal
+        if ( multiplier < 1 || multiplier > 9.9)
+            return defaultMultiplier;
+        else 
+            return multiplier;
+    },
+    getSettingLoop() : boolean {
+        const defaultLoop : boolean = this.defaultOption.loop;
+        const filteredLine = this.getPluginCodeBlockData(regexLoop);
+        if (filteredLine.length == 0) 
+            return defaultLoop;
+        const loop : boolean = regexLoop.exec(filteredLine[0]) ? true : false;
+        return loop;
     },
 
 
@@ -247,101 +323,9 @@ export default defineComponent({
 
     },
 
-    getFirstOrDefaultSettingsValue(expretion : RegExp) : string | null 
-    {
-      const filteredLines = this.getPluginCodeBlockData(expretion)
-      if(filteredLines.length == 0) return null;
-      const settingValue = expretion.exec(filteredLines[0])?.at(1);
-      if((settingValue === undefined)) return null;
-      return settingValue;
-    },
-
-    getLoopValue() : boolean {
-      return false;
-    },
-
-    getPlaybackSpeedSetting() : number {
-      const defaultSpeed = this.audio.defaultPlaybackRate;
-      
-      const regex = new RegExp('playback: *([0-9\.]*)', 'g');
-      
-      const playbackSpeed = this.getFirstOrDefaultSettingsValue(regex);
-      
-      if((playbackSpeed === null)) return defaultSpeed;
-      var numericRepr = parseFloat(playbackSpeed);
-      if(isNaN(numericRepr)) return defaultSpeed;
-      return numericRepr;
-    },
-
-    getLoopSetting() : boolean {
-      const defaultSpeed = this.audio.defaultPlaybackRate;
-      
-      const regex = new RegExp('loop: *((t|T)rue)', 'g');
-      
-      const loopSetting = this.getFirstOrDefaultSettingsValue(regex);
-      
-      return !(loopSetting === null);
-    },
     
-    getParentWidth() { return this.mdElement.clientWidth },
     isCurrent() { return this.audio.src === this.srcPath; },
-    async loadFile() {
-      // read file from vault 
-      const file = window.app.vault.getAbstractFileByPath(this.filepath) as TFile;
-
-      // process audio file & set audio el source
-      if (file && file instanceof TFile) {
-        //check cached values
-        if (!this.loadCache()) 
-          this.processAudio(file.path);
-
-        this.srcPath = window.app.vault.getResourcePath(file);
-      }
-    },
-    saveCache() {
-      localStorage[`${this.filepath}`] = JSON.stringify(this.filteredData);
-      localStorage[`${this.filepath}_duration`] = this.duration;
-    },
-    loadCache(): boolean {
-      let cachedData = localStorage[`${this.filepath}`];
-      let cachedDuration = localStorage[`${this.filepath}_duration`];
-
-      if (!cachedData) { return false; }
-      
-      this.filteredData = JSON.parse(cachedData);
-      this.duration = Number.parseFloat(cachedDuration)
-      return true;
-    },  
-    async processAudio(path: string) {
-      const arrBuf = await window.app.vault.adapter.readBinary(path);
-      const audioContext = new AudioContext();
-      const tempArray = [] as number[];
-
-      audioContext.decodeAudioData(arrBuf, (buf) => {
-        let rawData = buf.getChannelData(0);
-        this.duration = buf.duration;
-
-        const blockSize = Math.floor(rawData.length / this.nSamples);
-        for (let i = 0; i < this.nSamples; i++) {
-          let blockStart = blockSize * i;
-          let sum = 0;
-          for (let j = 0; j < blockSize; j++) {
-            sum += Math.abs(rawData[blockStart + j]);
-          }
-          tempArray.push(sum / blockSize);
-        }
-        
-        let maxval = Math.max(...tempArray);
-        this.filteredData = tempArray.map(x => x / maxval);
-        this.saveCache();
-      })
-    },
-    setPlayBackRate(multiplier : number){
-      this.audio.playbackRate = multiplier;
-    },
-    setLoopValue(value : boolean){
-      this.audio.loop = value;
-    },
+    
   },
   created() { 
     this.loadFile();
