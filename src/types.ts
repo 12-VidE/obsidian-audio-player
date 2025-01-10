@@ -9,7 +9,6 @@ export type AudioPlayerRendererOptions = {
 	ctx: MarkdownPostProcessorContext;
 	player: HTMLAudioElement;
 	filepath: string;
-    defaultOption: AudioPlayerOptions;
 };
 
 export type AudioPlayerOptions = {

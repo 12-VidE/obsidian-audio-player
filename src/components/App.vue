@@ -29,11 +29,11 @@
         <!-- Timestamp Input -->
         <div v-if="showInput" class="timestamp-input">
             <input v-model="newTimestamp" type="text" ref="commentInput"
-                @keydown.escape="showInput = false; editMode = false; newTimestamp = ''" 
+                @keydown.escape="showInput = false; editMode = false; deleteConfirm = false; newTimestamp = ''" 
                 @keydown.enter="addTimestamp">
             <button @click="addTimestamp">{{editMode ? "Confirm" : "Add"}}</button>
-            <button @click="showInput = false; editMode = false; newTimestamp = ''">Cancel</button>
-            <button v-if="editMode" @click="showInput = false; editMode = false; deleteTimestamp(editTime)">Delete</button>
+            <button @click="showInput = false; editMode = false; deleteConfirm = false; newTimestamp = ''">Cancel</button>
+            <button v-if="editMode" @click="confirmDelete">{{ deleteConfirm ? 'Sure?' : 'Delete' }}</button>
         </div>
         <!-- Timestamps list -->
         <div :class="['comment-list', showInput && 'disabled-block']">
@@ -58,6 +58,12 @@ import AudioTimestampVue from "./AudioTimestamp.vue";
 const regexTimestamp = new RegExp('^(.+) --- (.+)$');
 const regexSpeed = new RegExp('speed: *([0-9\.]*)');
 const regexLoop = new RegExp('loop: *((t|T)rue)');
+const regexVolume = new RegExp('volume: *([0-9\.]*)');
+const defaultOption : AudioPlayerOptions = {
+    volume: 0.5,
+    speed: 1,
+    loop: false,
+};
 
 export default defineComponent({
   name: "App",
@@ -69,7 +75,6 @@ export default defineComponent({
     ctx: Object as PropType<MarkdownPostProcessorContext>,
     mdElement: Object as PropType<HTMLElement>,
     audio: Object as PropType<HTMLAudioElement>,
-    defaultOption: Object as PropType<AudioPlayerOptions>
   },
     data() {
         return {
@@ -86,6 +91,7 @@ export default defineComponent({
             editTime: -1,
             showInput: false,
             newTimestamp: '',
+            deleteConfirm: false,
 
             activeComment: null as AudioTimestamp | null,
         }
@@ -157,6 +163,7 @@ export default defineComponent({
         // Apply correct settings
         this.setPlayBackRate(this.getSettingPlaybackSpeed());
         this.setLoopValue(this.getSettingLoop());
+        this.setVolume(this.getSettingVolume());
         this.audio.addEventListener('timeupdate', this.timeUpdateHandler); //Fix
         
         this.audio?.play();
@@ -174,7 +181,6 @@ export default defineComponent({
         this.audio.paused ? this.play() : this.pause();
     },
     setPlayPosition(time: number) {
-        console.log("###" + time);
         this.currentTime = time;
         if (!this.isCurrent())
             this.togglePlay();
@@ -192,6 +198,9 @@ export default defineComponent({
     },
     setLoopValue(value : boolean){
       this.audio.loop = value;
+    },
+    setVolume(volume : number){
+        this.audio.volume = volume;
     },
 
     /* --- Timestamp --- */
@@ -227,7 +236,7 @@ export default defineComponent({
                 content: this.newTimestamp,
             };
             newIndex = timestamps.findIndex((item : AudioTimestamp) => newTimestamp.time == item.time);
-            if(newIndex == -1) console.warn("Impossible index");    
+            if(newIndex == -1) return;    
         }
 
         lines.splice(sectionInfo.lineEnd-timestamps.length+newIndex, this.editMode ? 1 : 0, `${newTimestamp.time} --- ${newTimestamp.content}`);
@@ -237,6 +246,19 @@ export default defineComponent({
         this.showInput = false;
         this.editMode = false;
         this.editTime = -1;
+        this.deleteConfirm = false;
+    },
+    confirmDelete() {
+        if (this.deleteConfirm) {
+            // Trigger the actual deletion if confirmed
+            this.showInput = false;
+            this.editMode = false;
+            this.deleteTimestamp(this.editTime);
+            this.deleteConfirm = false;  // Reset confirmation state
+        } else {
+            // Set the flag to show "Sure?" on the next click
+            this.deleteConfirm = true;
+        }
     },
     deleteTimestamp(time: number){
         const timestamps = this.getTimestamps();
@@ -286,7 +308,7 @@ export default defineComponent({
         return lines.filter((item : string) => regex.test(item));
     },
     getSettingPlaybackSpeed() : number {
-        const defaultMultiplier : number = this.defaultOption.speed;
+        const defaultMultiplier : number = defaultOption.speed;
         const filteredLine = this.getPluginCodeBlockData(regexSpeed);
         if (filteredLine.length == 0) 
             return defaultMultiplier;
@@ -298,12 +320,24 @@ export default defineComponent({
             return multiplier;
     },
     getSettingLoop() : boolean {
-        const defaultLoop : boolean = this.defaultOption.loop;
+        const defaultLoop : boolean = defaultOption.loop;
         const filteredLine = this.getPluginCodeBlockData(regexLoop);
         if (filteredLine.length == 0) 
             return defaultLoop;
         const loop : boolean = regexLoop.exec(filteredLine[0]) ? true : false;
         return loop;
+    },
+    getSettingVolume() : number {
+        const defaultVolume : number = defaultOption.volume;
+        const filteredLine = this.getPluginCodeBlockData(regexVolume);
+        if (filteredLine.length == 0) 
+            return defaultVolume;
+        let volume : number = parseFloat(regexVolume.exec(filteredLine[0])![1]);
+        volume = Math.round(volume*10)/10; // Allow only 1 decimal
+        if ( volume < 0 || volume > 1)
+            return defaultVolume;
+        else 
+            return volume;
     },
 
 

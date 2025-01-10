@@ -15,8 +15,7 @@ export class AudioPlayerRenderer extends MarkdownRenderChild {
 			filepath: this.options.filepath,
 			ctx: this.options.ctx,
 			mdElement: containerEl,
-			audio: this.options.player,
-            defaultOption: this.options.defaultOption, 
+			audio: this.options.player
 		});
 	}
 

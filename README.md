@@ -27,7 +27,8 @@ They are manually inserted in the codeblock by the user.
 
 - `audio` = Internal Obsidian link to the audio file to use
 - `speed` [optional] = Playback multiplier = `1.0-9.9` (default: `1.0`)
-- `loop` [optional] = = `true-false` (default: `false`)
+- `loop` [optional] = Loop at the start when the track ends = `true-false` (default: `false`)
+- `volume` [optional] = Volume percentage = `0.1-1.0` (default: `0.5`)
 
 ### Complete Example
 ~~~
