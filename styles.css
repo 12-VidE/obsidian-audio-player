@@ -60,6 +60,14 @@ If your plugin does not need CSS, delete this file.
 	justify-content: space-between;
 	color: var(--color-base-50);
 	font-size: 0.9rem;
+    margin-left: 1em;
+    margin-right: 1em;
+}
+.timeline-container{
+    display: flex;
+    flex-direction: column; /* Stack children vertically */
+    gap: 3px; /* Add spacing between the range slider and the timeline */
+    width: 100%; /* Ensure it takes full width if needed */ 
 }
 
 /* Controls*/
@@ -134,6 +142,11 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
+    &::after{
+        content: ''; /* Create a pseudo-element for spacing at the end */
+        display: block;
+        height: 20px; /* Ensures sticky stops 20px before this element */
+    }
 }
 
 .timestamp {
@@ -167,7 +180,20 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	gap: 6px;
 	margin-top: 4px;
+    flex-wrap: wrap;
+    align-items: center;
+    > input {
+        flex: 1; /* Allow the input to take available space */
+        min-width: 12em; /* Ensure input doesn't shrink too much */
+        width: 100%;
+    }
 }
+.timestamp-buttons {
+    display: flex;
+    gap: 8px; /* Add spacing between buttons */
+    flex-shrink: 0; /* Prevent the group from shrinking */
+}
+
 
 .active-comment {
 	background-color: #ffffff10;
@@ -181,4 +207,15 @@ If your plugin does not need CSS, delete this file.
 .disabled-block {
     pointer-events: none; 
     opacity: 0.6;
+}
+
+.sticky-container {
+    background-color: var(--color-base-10);
+    border-color: var(--color-base-30);
+    transition: all 0.3s ease;
+    &.is-sticky{
+        position: sticky;
+        top: 0; /* Stick to the top */
+        z-index: 10; /* Above other content */
+    }
 }

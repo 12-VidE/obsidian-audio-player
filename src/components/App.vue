@@ -1,39 +1,42 @@
 <template>
     <div class="audio-player-ui" tabindex="0">
-        <div :class="['horiz', showInput && 'disabled-block']">
-            <!-- WaveGraph + Timeline -->
-            <div class="vert wide">
-                <div class="waveform wide">
-                    <div class="wv" v-for="(s, i) in filteredData" :key="srcPath+i"
-                        v-bind:class="{'played': i <= currentBar }"
-                        :style="{
-                            height: s * 100 + 'px'
-                    }"></div>
-                </div>
-                <div class="wide">
-                    <input type="range" id="timeline-range" min="0" :max="duration" step="0.1" v-model="currentTime" @input="onTimeBarInput" />
-                    <div class="timeline">
-                        <span class="current-time">{{ displayedCurrentTime }}</span>
-                        <span class="duration">{{ displayedDuration }}</span>
-                    </div>
-                </div>
+        <!-- WaveGraph -->
+        <div class="vert wide" :class="['horiz', showInput && 'disabled-block']">
+            <div class="waveform wide">
+                <div class="wv" v-for="(s, i) in filteredData" :key="srcPath+i"
+                    v-bind:class="{'played': i <= currentBar }"
+                    :style="{
+                        height: s * 100 + 'px'
+                }"></div>
             </div>
         </div>
-        <!-- Controls -->
-        <div :class="['horiz', showInput && 'disabled-block']" style="margin: auto">
-            <div class="playpause seconds" @click="setPlayPosition(currentTime-5)" ref="min5">-5s</div>
-            <div class="playpause" @click="togglePlay" ref="playpause"></div>
-            <div class="playpause seconds" @click="setPlayPosition(currentTime+5)" ref="add5">+5s</div>
-            <div class="showTimestamp" @click="showTimestampInput" ref="showTimestamp"></div>
-        </div>
+        <div ref="stickyContainer" :class="['sticky-container', isSticky && 'is-sticky']">
+            <!-- Timeline -->
+            <div class="timeline-container wide vert" :class="['horiz', showInput && 'disabled-block']">
+                <input type="range" id="timeline-range" min="0" :max="duration" step="0.1" v-model="currentTime" @input="onTimeBarInput" />
+                <div class="timeline">
+                    <span class="current-time">{{ displayedCurrentTime }}</span>
+                    <span class="duration">{{ displayedDuration }}</span>
+                </div>
+            </div>
+            <!-- Controls -->
+            <div :class="['horiz', showInput && 'disabled-block']" style="display: flex; justify-content: center; margin: auto;">
+                <div class="playpause seconds" @click="setPlayPosition(currentTime-5)" ref="min5">-5s</div>
+                <div class="playpause" @click="togglePlay" ref="playpause"></div>
+                <div class="playpause seconds" @click="setPlayPosition(currentTime+5)" ref="add5">+5s</div>
+                <div class="showTimestamp" @click="showTimestampInput" ref="showTimestamp"></div>
+            </div>
+        </div>    
         <!-- Timestamp Input -->
         <div v-if="showInput" class="timestamp-input">
             <input v-model="newTimestamp" type="text" ref="commentInput"
                 @keydown.escape="showInput = false; editMode = false; deleteConfirm = false; newTimestamp = ''" 
                 @keydown.enter="addTimestamp">
-            <button @click="addTimestamp">{{editMode ? "Confirm" : "Add"}}</button>
-            <button @click="showInput = false; editMode = false; deleteConfirm = false; newTimestamp = ''">Cancel</button>
-            <button v-if="editMode" @click="confirmDelete" :style="{ 'background-color': deleteConfirm ? 'var(--interactive-accent)' : '' }">{{ deleteConfirm ? 'Sure?' : 'Delete' }}</button>
+            <div class="timestamp-buttons">
+                <button @click="addTimestamp">{{editMode ? "Confirm" : "Add"}}</button>
+                <button @click="showInput = false; editMode = false; deleteConfirm = false; newTimestamp = ''">Cancel</button>
+                <button v-if="editMode" @click="confirmDelete" :style="{ 'background-color': deleteConfirm ? 'var(--interactive-accent)' : '' }">{{ deleteConfirm ? 'Sure?' : 'Delete' }}</button>
+            </div>
         </div>
         <!-- Timestamps list -->
         <div :class="['comment-list', showInput && 'disabled-block']">
@@ -57,12 +60,14 @@ import AudioTimestampVue from "./AudioTimestamp.vue";
 
 const regexTimestamp = new RegExp('^(.+) --- (.+)$');
 const regexSpeed = new RegExp('speed: *([0-9\.]*)');
-const regexLoop = new RegExp('loop: *((t|T)rue)');
+const regexLoop = new RegExp('loop: *(?:((?:T|t)rue)|((?:F|f)alse))');
+const regexSticky = new RegExp('sticky: *(?:((?:T|t)rue)|((?:F|f)alse))');
 const regexVolume = new RegExp('volume: *([0-9\.]*)');
 const defaultOption : AudioPlayerOptions = {
     volume: 0.5,
     speed: 1,
     loop: false,
+    sticky: false,
 };
 
 export default defineComponent({
@@ -94,6 +99,7 @@ export default defineComponent({
             deleteConfirm: false,
 
             activeComment: null as AudioTimestamp | null,
+            isSticky: false,
         }
     },
   computed: {
@@ -276,8 +282,25 @@ export default defineComponent({
         this.editMode = true;
         this.editTime = time;
 
+        this.pause();
+        
         // Place timestamp
         this.newTimestamp = this.getTimestamp(time).content;
+
+        // Scroll the timestamp input into view
+        this.$nextTick(() => {
+            const timestampInput = this.$refs.commentInput as HTMLInputElement;
+            if (timestampInput) {
+                timestampInput.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center' // Adjust to 'start' or 'end' if needed
+                });
+            }
+             // Delay focusing until the scrolling completes
+             setTimeout(() => {
+                timestampInput.focus(); // Focus on the input box after scrolling
+            }, 300); // Adjust the delay time (300ms is an example)
+        });
     },
     getTimestamps() : Array<AudioTimestamp> {
         const timestampLines = this.getPluginCodeBlockData(regexTimestamp);
@@ -298,7 +321,6 @@ export default defineComponent({
     },
 
     /* -- Controls Handling --- */
-
 
 
     /* -- Other -- */
@@ -324,7 +346,7 @@ export default defineComponent({
         const filteredLine = this.getPluginCodeBlockData(regexLoop);
         if (filteredLine.length == 0) 
             return defaultLoop;
-        const loop : boolean = regexLoop.exec(filteredLine[0]) ? true : false;
+        const loop : boolean = regexLoop.exec(filteredLine[0])![1] ? true : false;
         return loop;
     },
     getSettingVolume() : number {
@@ -338,6 +360,14 @@ export default defineComponent({
             return defaultVolume;
         else 
             return volume;
+    },
+    getSettingSticky() : boolean {
+        const defaultSticky : boolean = defaultOption.sticky;
+        const filteredLine = this.getPluginCodeBlockData(regexSticky);
+        if (filteredLine.length == 0) 
+            return defaultSticky;
+        const sticky : boolean = regexSticky.exec(filteredLine[0])![1] ? true : false;
+        return sticky;
     },
 
 
@@ -357,21 +387,22 @@ export default defineComponent({
 
     },
 
-    
     isCurrent() { return this.audio.src === this.srcPath; },
-    
+
   },
   created() { 
     this.loadFile();
   },
     mounted() {
-        //Set (dynamic) buttons
         this.playpauseBtn = this.$refs.playpause as HTMLSpanElement;
         this.showtimestampBtn = this.$refs.showTimestamp as HTMLSpanElement;
 
         // Initialize icons
         setIcon(this.playpauseBtn, "play");
         setIcon(this.showtimestampBtn,"bookmark-plus");
+
+        // Initialize ?
+        this.isSticky = this.getSettingSticky();
 
         // Add event listeners
         document.addEventListener('allpause', () => {  
@@ -408,7 +439,7 @@ export default defineComponent({
         setTimeout(() => { this.comments = this.getTimestamps(); });
   },
   beforeDestroy() {
-    this.ro.unobserve(this.$el);
+    // None
   }
 })
 

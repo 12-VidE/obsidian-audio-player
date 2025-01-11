@@ -15,4 +15,5 @@ export type AudioPlayerOptions = {
     volume: number,
     speed: number;
     loop: boolean;
+    sticky: boolean;
 }

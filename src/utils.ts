@@ -1,6 +1,6 @@
 export function secondsToString(num: number) {
 	num = Math.floor(num);
-	const h = String(Math.floor(num / 3600)).padStart(2, "0");
+	const h = String(Math.floor(num / 3600)).padStart(1, "0");
 	const m = String(Math.floor((num % 3600) / 60)).padStart(2, "0");
 	const s = String(num % 60).padStart(2, "0");
 
