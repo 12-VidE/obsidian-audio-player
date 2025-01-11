@@ -188,11 +188,6 @@ If your plugin does not need CSS, delete this file.
         width: 100%;
     }
 }
-.timestamp-buttons {
-    display: flex;
-    gap: 8px; /* Add spacing between buttons */
-    flex-shrink: 0; /* Prevent the group from shrinking */
-}
 
 
 .active-comment {
@@ -207,6 +202,17 @@ If your plugin does not need CSS, delete this file.
 .disabled-block {
     pointer-events: none; 
     opacity: 0.6;
+}
+
+.sticky-container {
+    background-color: var(--color-base-10);
+    border-color: var(--color-base-30);
+    transition: all 0.3s ease;
+    &.is-sticky{
+        position: sticky;
+        top: 0; /* Stick to the top */
+        z-index: 10; /* Above other content */
+    }
 }
 
 .sticky-container {
