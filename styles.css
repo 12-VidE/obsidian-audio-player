@@ -68,6 +68,14 @@ If your plugin does not need CSS, delete this file.
     flex-direction: column; /* Stack children vertically */
     gap: 3px; /* Add spacing between the range slider and the timeline */
     width: 100%; /* Ensure it takes full width if needed */ 
+    margin-left: 1em;
+    margin-right: 1em;
+}
+.timeline-container{
+    display: flex;
+    flex-direction: column; /* Stack children vertically */
+    gap: 3px; /* Add spacing between the range slider and the timeline */
+    width: 100%; /* Ensure it takes full width if needed */ 
 }
 
 /* Controls*/
@@ -142,6 +150,11 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
+    &::after{
+        content: ''; /* Create a pseudo-element for spacing at the end */
+        display: block;
+        height: 20px; /* Ensures sticky stops 20px before this element */
+    }
     &::after{
         content: ''; /* Create a pseudo-element for spacing at the end */
         display: block;
