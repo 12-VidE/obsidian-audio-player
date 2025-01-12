@@ -202,7 +202,7 @@ If your plugin does not need CSS, delete this file.
 
 
 .active-comment {
-	background-color: var(--background-modifier-form-field);
+	background-color: var(--background-secondary);
 }
 
 .disabled-block {
@@ -211,7 +211,7 @@ If your plugin does not need CSS, delete this file.
 }
 
 .sticky-container {
-    background-color: var(--color-base-10);
+    background-color: var(--background-secondary);
     border-color: var(--color-base-30);
     transition: all 0.3s ease;
     &.is-sticky{
