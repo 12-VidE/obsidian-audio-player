@@ -12,7 +12,7 @@ export default class AudioPlayer extends Plugin {
 		const body = document.getElementsByTagName("body")[0];
 		body.appendChild(player);
 
-		this.addCommand({
+		/* this.addCommand({
 			id: "pause-audio",
 			name: "Pause Audio",
 			callback: () => {
@@ -67,7 +67,7 @@ export default class AudioPlayer extends Plugin {
 			callback: () => {
 				if (player.src) player.currentTime -= 5;
 			}
-		});
+		}); */
 
 		this.registerMarkdownCodeBlockProcessor(
 			"audio-player",
@@ -100,7 +100,6 @@ export default class AudioPlayer extends Plugin {
                     return;
                 }
 					
-
 				// create root $el
 				const container = el.createDiv();
 				container.classList.add("base-container");

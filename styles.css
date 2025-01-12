@@ -50,10 +50,6 @@ If your plugin does not need CSS, delete this file.
 
 
 /* Timeline */
-#timeline-range {
-    width: 100%;
-    margin: 0;
-}
 .timeline {
 	height: 20px;
 	display: flex;
@@ -67,7 +63,11 @@ If your plugin does not need CSS, delete this file.
     display: flex;
     flex-direction: column; /* Stack children vertically */
     gap: 3px; /* Add spacing between the range slider and the timeline */
-    width: 100%; /* Ensure it takes full width if needed */ 
+    width: 100%; /* Ensure it takes full width if needed */
+    > input[type='range']{
+        width: 100% !important;
+        margin: 0;
+    }
 }
 
 /* Controls*/
@@ -115,6 +115,12 @@ If your plugin does not need CSS, delete this file.
 	padding-bottom: 0;
 	height: 25px;
 	flex: unset;
+}
+
+.controls-container{
+    display: flex;
+    justify-content: center;
+    margin: auto;
 }
 
 /* WaveForm Graph */

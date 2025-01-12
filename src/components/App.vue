@@ -1,9 +1,9 @@
 <template>
     <div class="audio-player-ui" tabindex="0">
         <!-- WaveGraph -->
-        <div class="vert wide" :class="['horiz', showInput && 'disabled-block']">
-            <div class="waveform wide">
-                <div class="wv" v-for="(s, i) in filteredData" :key="srcPath+i"
+        <div :class="['vert', 'wide', showInput && 'disabled-block']">
+            <div :class="['waveform', 'wide']">
+                <div :class="['wv']" v-for="(s, i) in filteredData" :key="srcPath+i"
                     v-bind:class="{'played': i <= currentBar }"
                     :style="{
                         height: s * 100 + 'px'
@@ -12,36 +12,43 @@
         </div>
         <div ref="stickyContainer" :class="['sticky-container', isSticky && 'is-sticky']">
             <!-- Timeline -->
-            <div class="timeline-container wide vert" :class="['horiz', showInput && 'disabled-block']">
-                <input type="range" id="timeline-range" min="0" :max="duration" step="0.1" v-model="currentTime" @input="onTimeBarInput" />
-                <div class="timeline">
-                    <span class="current-time">{{ displayedCurrentTime }}</span>
-                    <span class="duration">{{ displayedDuration }}</span>
+            <div :class="['timeline-container','vert','wide', showInput && 'disabled-block']">
+                <input type="range" min="0" :max="duration" step="0.1" v-model="currentTime" 
+                    @input="onTimeBarInput" />
+                <div :class="['timeline']">
+                    <span :class="['current-time']">{{ displayedCurrentTime }}</span>
+                    <span :class="['duration']">{{ displayedDuration }}</span>
                 </div>
             </div>
             <!-- Controls -->
-            <div :class="['horiz', showInput && 'disabled-block']" style="display: flex; justify-content: center; margin: auto;">
-                <div class="playpause seconds" @click="setPlayPosition(currentTime-5)" ref="min5">-5s</div>
-                <div class="playpause" @click="togglePlay" ref="playpause"></div>
-                <div class="playpause seconds" @click="setPlayPosition(currentTime+5)" ref="add5">+5s</div>
-                <div class="showTimestamp" @click="showTimestampInput" ref="showTimestamp"></div>
+            <div :class="['controls-container', showInput && 'disabled-block']" >
+                <div ref="min5" :class="['playpause', 'seconds']" 
+                    @click="setPlayPosition(currentTime-5)">
+                    -5s</div>
+                <div ref="playpause" :class="['playpause']"
+                    @click="togglePlay" ></div>
+                <div ref="add5" :class="['playpause', 'seconds']"
+                    @click="setPlayPosition(currentTime+5)">
+                    +5s</div>
+                <div ref="showTimestamp" :class="['showTimestamp']" 
+                    @click="showTimestampInput"></div>
             </div>
         </div>    
         <!-- Timestamp Input -->
-        <div v-if="showInput" class="timestamp-input">
-            <input v-model="newTimestamp" type="text" ref="commentInput"
+        <div v-if="showInput" :class="['timestamp-input']">
+            <input ref="commentInput" v-model="newTimestamp" type="text" 
                 :class="[isDuplicate && 'disabled-block']"
                 @keydown.escape="showInput = false; editMode = false; deleteConfirm = false; newTimestamp = ''" 
                 @keydown.enter="addTimestamp">
-            <div class="timestamp-buttons">
-                <button :class="[isDuplicate && 'disabled-block']" @click="addTimestamp">
-                    {{editMode ? "Confirm" : "Add"}}
-                </button>
+            <div :class="['timestamp-buttons']">
+                <button :class="[isDuplicate && 'disabled-block']" 
+                    @click="addTimestamp">
+                    {{editMode ? "Confirm" : "Add"}}</button>
                 <button @click="showInput = false; editMode = false; deleteConfirm = false; isDuplicate = false; newTimestamp = ''">Cancel</button>
                 <button v-if="editMode" @click="confirmDelete" :style="{ 'background-color': deleteConfirm ? 'var(--interactive-accent)' : '' }">{{ deleteConfirm ? 'Sure?' : 'Delete' }}</button>
             </div>
         </div>
-        <!-- Timestamps list -->
+        <!-- Timestamps List -->
         <div :class="['comment-list', showInput && 'disabled-block']">
             <AudioTimestampVue v-for="cmt in commentsSorted" v-bind:class="{'active-comment': cmt.time === activeComment?.time }"
                 @move-playhead="setPlayPosition" 
@@ -118,26 +125,25 @@ export default defineComponent({
     methods: {
     /* --- Backend --- */
         async loadFile() {
-            // read file from vault 
+            // Read file from vault 
             const file = window.app.vault.getAbstractFileByPath(this.filepath) as TFile;
-
-            // process audio file & set audio el source
+            // Process audio file & set audio source
             if (file && file instanceof TFile) {
                 //check cached values
                 if (!this.loadCache()) 
-                    this.processAudio(file.path);
+                    await this.processAudio(file.path);
                 this.srcPath = window.app.vault.getResourcePath(file);
             }
         },
         saveCache() {
             localStorage[`${this.filepath}`] = JSON.stringify(this.filteredData);
-            localStorage[`${this.filepath}_duration`] = this.duration;
+            localStorage[`${this.filepath}_duration`] = this.duration.toString();
         },
         loadCache(): boolean {
             let cachedData = localStorage[`${this.filepath}`];
             let cachedDuration = localStorage[`${this.filepath}_duration`];
 
-            if (!cachedData) return false;
+            if (!cachedData || !cachedDuration) return false;
             
             this.filteredData = JSON.parse(cachedData);
             this.duration = Number.parseFloat(cachedDuration)
@@ -146,7 +152,7 @@ export default defineComponent({
         async processAudio(path: string) {
             const arrBuf = await window.app.vault.adapter.readBinary(path);
             const audioContext = new AudioContext();
-            const tempArray = [] as number[];
+            const tempArray : Array<number> = [];
 
             audioContext.decodeAudioData(arrBuf, (buf) => {
                 let rawData = buf.getChannelData(0);
@@ -166,6 +172,22 @@ export default defineComponent({
                 this.saveCache();
             })
         },
+        timeUpdateHandler() {
+            if (this.audio.src === this.srcPath) {
+                this.currentTime = this.audio?.currentTime;
+
+                const nextTimestamps = this.commentsSorted.filter((x: AudioTimestamp) => this.audio?.currentTime >= x.time);
+                
+
+                if (nextTimestamps.length == 1) {
+                    this.activeComment = nextTimestamps[0];
+                }
+                if (nextTimestamps.length > 1) {
+                    this.activeComment = nextTimestamps[nextTimestamps.length - 1];
+                }
+            }
+        },
+        isCurrent() { return this.audio.src === this.srcPath; },
 
         /* --- Audio State --- */
         play() {
@@ -180,12 +202,12 @@ export default defineComponent({
             
             this.audio?.play();
             this.playing = true;
-            setIcon(this.playpauseBtn, "pause");  
+            setIcon(this.$refs.playpause, "pause");  
         },
         pause() {
             this.audio?.pause();
             this.playing = false;
-            setIcon(this.playpauseBtn, "play");
+            setIcon(this.$refs.playpause, "play");
         },
         togglePlay() {
             if (!this.isCurrent())
@@ -206,10 +228,10 @@ export default defineComponent({
                 this.audio.currentTime = this.currentTime;
         },
         setPlayBackRate(multiplier : number){
-        this.audio.playbackRate = multiplier;
+            this.audio.playbackRate = multiplier;
         },
         setLoopValue(value : boolean){
-        this.audio.loop = value;
+            this.audio.loop = value;
         },
         setVolume(volume : number){
             this.audio.volume = volume;
@@ -218,16 +240,15 @@ export default defineComponent({
         /* --- Timestamp --- */
         showTimestampInput() {
             this.pause();
-            this.showInput = true; // triggers template TO show section
-            const isNotUnique : boolean = this.getTimestamps().some( (timestamp :AudioTimestamp) => timestamp.time == Math.floor(this.currentTime));
+            this.showInput = true;
+            const isNotUnique : boolean = this.getTimestamps().some( (timestamp :AudioTimestamp) => timestamp.time === Math.floor(this.currentTime));
             setTimeout(() => {
-                const input = this.$refs.commentInput as HTMLInputElement;
                 if (isNotUnique && !this.editMode){ // IF we are creating a new timestamp WHERE there's already one: ban it
                     this.newTimestamp = "ALREADY EXISTS!";
                     this.isDuplicate = true;
                 } else
-                    input.focus();
-            })
+                    this.$refs.commentInput.focus();
+            }, 0);
         },
         addTimestamp() {
             if (this.newTimestamp.length == 0)
@@ -379,44 +400,21 @@ export default defineComponent({
             const sticky : boolean = regexSticky.exec(filteredLine[0])![1] ? true : false;
             return sticky;
         },
-
-
-        timeUpdateHandler() {
-            if (this.isCurrent()) {
-                this.currentTime = this.audio?.currentTime;
-
-                const nextTimestamps = this.commentsSorted.filter((x: AudioTimestamp) => this.audio?.currentTime >= x.time);
-                
-
-                if (nextTimestamps.length == 1) {
-                    this.activeComment = nextTimestamps[0];
-                }
-                if (nextTimestamps.length > 1) {
-                    this.activeComment = nextTimestamps[nextTimestamps.length - 1];
-                }
-            }
-        },
-
-        isCurrent() { return this.audio.src === this.srcPath; },
-
     },
     created() { 
         this.loadFile();
     },
     mounted() {
-        this.playpauseBtn = this.$refs.playpause as HTMLSpanElement;
-        this.showtimestampBtn = this.$refs.showTimestamp as HTMLSpanElement;
-
         // Initialize icons
-        setIcon(this.playpauseBtn, "play");
-        setIcon(this.showtimestampBtn,"bookmark-plus");
+        setIcon(this.$refs.playpause, "play");
+        setIcon(this.$refs.showTimestamp,"bookmark-plus");
 
         // Initialize ?
         this.isSticky = this.getSettingSticky();
 
-        // Add event listeners
-        document.addEventListener('allpause', () => {  
-            setIcon(this.playpauseBtn, "play");
+        // Add event listeners (for Obsidian comands)
+        /* document.addEventListener('allpause', () => {  
+            setIcon(this.$refs.playpause, "play");
         });
         document.addEventListener('allresume', () => {
             if (this.isCurrent())
@@ -428,21 +426,21 @@ export default defineComponent({
         })
         document.addEventListener('togglePlayState', () => {
             if (this.audio.src === this.srcPath) {
-            this.togglePlay()
-            setIcon(this.playpauseBtn, this.audio.paused ? 'play' : 'pause');
+                this.togglePlay()
+                setIcon(this.$refs.playpause, this.audio.paused ? 'play' : 'pause');
             }
-        });
-
+        }); */
+        // Add event-listeners (for other cases)
         this.audio.addEventListener('ended', () => {
             if (this.audio.src === this.srcPath)
-                setIcon(this.playpauseBtn, "play");
+                setIcon(this.$refs.playpause, "play");
         });
 
         // get current time
         if (this.audio.src === this.srcPath) {
             this.currentTime = this.audio.currentTime
             this.audio.addEventListener('timeupdate', this.timeUpdateHandler);
-            setIcon(this.playpauseBtn, this.audio.paused ? 'play' : 'pause');
+            setIcon(this.$refs.playpause, this.audio.paused ? 'play' : 'pause');
         }
 
         // load comments
